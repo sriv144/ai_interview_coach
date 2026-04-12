@@ -1,0 +1,17 @@
+# requirements.txt
+
+# Web Framework
+fastapi
+uvicorn[standard]
+python-dotenv
+
+# LLM Orchestration
+langchain
+langchain-openai
+
+# Document & Audio Processing
+pypdf
+openai-whisper
+
+# Vector Store (for later)
+faiss-cpu

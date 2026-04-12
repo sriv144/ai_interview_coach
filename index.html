@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Coach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        #status-light { width: 12px; height: 12px; border-radius: 50%; transition: background-color 0.3s; }
+        .light-gray { background-color: #d1d5db; }
+        .light-green { background-color: #34d399; }
+        .light-red { background-color: #f87171; }
+        .light-yellow { background-color: #fbbf24; }
+        .light-blue { background-color: #60a5fa; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-gray-100">AI Interview Coach</h1>
+            <p id="subtitle" class="text-gray-400 mt-2">Upload a Job Description to begin your interactive mock interview.</p>
+        </div>
+
+        <div class="flex items-center justify-center space-x-3 bg-gray-900 p-4 rounded-lg">
+            <div id="status-light" class="light-gray"></div>
+            <p id="status" class="text-gray-300 font-medium">Waiting for connection...</p>
+        </div>
+
+        <div id="initial-view">
+            <label for="jd-upload" class="block text-sm font-medium text-gray-400 mb-2">1. Upload Job Description (PDF)</label>
+            <input type="file" id="jd-upload" accept=".pdf" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"/>
+            <button id="start-interview-btn" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-gray-500" disabled>Start Interview</button>
+        </div>
+
+        <div id="interview-view" class="hidden text-center space-y-4">
+            <p id="ai-question" class="text-xl font-semibold text-indigo-300 min-h-[60px]"></p>
+            <div id="transcription-box" class="text-gray-400 bg-gray-700 p-3 rounded-lg min-h-[50px] text-left italic hidden"></div>
+            <div id="feedback-box" class="text-gray-300 bg-gray-900 p-4 rounded-lg min-h-[100px] text-left hidden"></div>
+            <button id="record-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+                🎤 Start Answering
+            </button>
+        </div>
+        
+        <div id="summary-view" class="hidden space-y-4">
+             <div class="text-center">
+                <h2 class="text-2xl font-bold text-gray-100">Interview Complete!</h2>
+                <p class="text-gray-400 mt-1">Here is your final performance summary.</p>
+            </div>
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h3 class="font-semibold text-lg text-indigo-300">Overall Score</h3>
+                <p id="final-score" class="text-3xl font-bold mt-2"></p>
+            </div>
+            <div class="bg-gray-900 p-4 rounded-lg">
+                <h3 class="font-semibold text-lg text-indigo-300">Overall Feedback</h3>
+                <p id="overall-feedback" class="text-gray-300 mt-2 whitespace-pre-wrap"></p>
+            </div>
+            <div id="full-history-container" class="space-y-3">
+                 <h3 class="font-semibold text-lg text-indigo-300 text-center">Detailed Breakdown</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const jdUpload = document.getElementById('jd-upload');
+        const startBtn = document.getElementById('start-interview-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const statusEl = document.getElementById('status');
+        const statusLight = document.getElementById('status-light');
+        const subtitle = document.getElementById('subtitle');
+        const initialView = document.getElementById('initial-view');
+        const interviewView = document.getElementById('interview-view');
+        const aiQuestionEl = document.getElementById('ai-question');
+        const transcriptionBox = document.getElementById('transcription-box');
+        const feedbackBox = document.getElementById('feedback-box');
+        
+        // NEW: Summary View Elements
+        const summaryView = document.getElementById('summary-view');
+        const finalScoreEl = document.getElementById('final-score');
+        const overallFeedbackEl = document.getElementById('overall-feedback');
+        const fullHistoryContainer = document.getElementById('full-history-container');
+
+        let socket;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        jdUpload.onchange = () => { startBtn.disabled = !(jdUpload.files.length > 0); };
+        const setStatus = (text, colorClass) => { statusEl.textContent = text; statusLight.className = `w-3 h-3 rounded-full transition-colors light-${colorClass}`;};
+
+        const connectWebSocket = () => {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws/interview`);
+
+            socket.onopen = () => { setStatus('Connected', 'green'); startBtn.disabled = jdUpload.files.length === 0; };
+
+            socket.onmessage = async (event) => {
+                const message = JSON.parse(event.data);
+                const data = message.data; 
+
+                switch (message.type) {
+                    case 'question':
+                        setStatus('AI is asking a question...', 'blue');
+                        aiQuestionEl.textContent = data.text;
+                        transcriptionBox.classList.add('hidden');
+                        feedbackBox.classList.add('hidden');
+                        const audioBlob = await (await fetch(`data:audio/mpeg;base64,${data.audio}`)).blob();
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        const audio = new Audio(audioUrl);
+                        audio.play();
+                        audio.onended = () => { setStatus('Ready for your answer', 'yellow'); recordBtn.disabled = false; recordBtn.innerText = '🎤 Start Answering'; };
+                        break;
+                    case 'evaluation':
+                        setStatus('Evaluation received, preparing next question...', 'green');
+                        const formattedScore = parseFloat(data.total_score).toFixed(1);
+                        transcriptionBox.innerHTML = `<strong>You said:</strong> ${data.transcribed_text}`;
+                        feedbackBox.innerHTML = `<strong>Feedback:</strong> ${data.feedback}<br><strong>Score:</strong> ${formattedScore}/10`;
+                        transcriptionBox.classList.remove('hidden');
+                        feedbackBox.classList.remove('hidden');
+                        break;
+                    case 'final_summary':
+                        setStatus('Interview finished', 'green');
+                        subtitle.textContent = "Your final report is ready.";
+                        
+                        // Populate and show the summary view
+                        finalScoreEl.textContent = `${parseFloat(data.final_score).toFixed(1)} / 10`;
+                        overallFeedbackEl.textContent = data.overall_feedback;
+
+                        // Clear and build the detailed history
+                        fullHistoryContainer.innerHTML = '<h3 class="font-semibold text-lg text-indigo-300 text-center">Detailed Breakdown</h3>'; // Reset
+                        data.full_history.forEach((turn, index) => {
+                            const turnDiv = document.createElement('div');
+                            turnDiv.className = 'bg-gray-700 p-3 rounded-lg';
+                            turnDiv.innerHTML = `
+                                <p class="font-bold text-gray-300">Q${index+1}: ${turn.question}</p>
+                                <p class="text-sm italic text-gray-400 mt-2"><strong>You said:</strong> ${turn.evaluation.transcribed_text}</p>
+                                <p class="text-sm text-gray-300 mt-2"><strong>Feedback:</strong> ${turn.evaluation.feedback}</p>
+                                <p class="text-sm font-semibold text-right text-indigo-300 mt-1">Score: ${parseFloat(turn.evaluation.total_score).toFixed(1)}/10</p>
+                            `;
+                            fullHistoryContainer.appendChild(turnDiv);
+                        });
+
+                        interviewView.classList.add('hidden');
+                        summaryView.classList.remove('hidden');
+                        break;
+                    case 'error': 
+                        setStatus('An error occurred', 'red');
+                        aiQuestionEl.textContent = `Error: ${data.error}`;
+                        recordBtn.disabled = true;
+                        break;
+                }
+            };
+
+            socket.onclose = () => { setStatus('Disconnected. Refresh to retry.', 'red'); startBtn.disabled = true; recordBtn.disabled = true; };
+            socket.onerror = (error) => { console.error("WebSocket Error:", error); setStatus('Connection Error', 'red'); };
+        };
+        
+        startBtn.onclick = () => {
+            const file = jdUpload.files[0];
+            if (file && socket && socket.readyState === WebSocket.OPEN) {
+                const reader = new FileReader();
+                reader.onload = (e) => { socket.send(e.target.result); initialView.classList.add('hidden'); interviewView.classList.remove('hidden'); setStatus('AI is preparing questions...', 'yellow'); };
+                reader.readAsArrayBuffer(file);
+            }
+        };
+
+        recordBtn.onclick = async () => {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        if (socket && socket.readyState === WebSocket.OPEN) { socket.send(audioBlob); }
+                        setStatus('Sending your answer...', 'blue');
+                        recordBtn.disabled = true;
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.innerText = '🛑 Stop Answering';
+                    recordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    recordBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    setStatus('Recording your answer...', 'red');
+                } catch (error) { console.error("Error accessing microphone:", error); alert("Could not access microphone."); }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerText = '... Processing ...';
+                recordBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                recordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            }
+        };
+        window.onload = connectWebSocket;
+    </script>
+</body>
+</html>
