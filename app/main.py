@@ -41,12 +41,27 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(error_msg.model_dump())
             return
 
-        # 2. Generate Questions
-        question_response = generate_questions_from_jd(jd_text)
+        # 2. Prompt for Resume (optional)
+        await websocket.send_json(WebSocketMessage(type="status", data={"text": "Upload your resume PDF (or send empty bytes to skip)"}).model_dump())
+
+        # 3. Get the Resume (if provided)
+        resume_bytes = await websocket.receive_bytes()
+        resume_text = ""
+        if len(resume_bytes) > 0:
+            resume_text = parse_pdf_to_text(io.BytesIO(resume_bytes))
+            if resume_text:
+                print("✅ Resume parsed successfully.")
+            else:
+                print("⚠️ Could not parse resume PDF, proceeding without it.")
+        else:
+            print("ℹ️ No resume provided, generating generic questions.")
+
+        # 4. Generate Questions
+        question_response = generate_questions_from_jd(jd_text, resume_text)
         questions = question_response.questions
         question_index = 0
-        
-        # 3. Start the Interview Loop
+
+        # 5. Start the Interview Loop
         while question_index < len(questions):
             current_question = questions[question_index].question
             
@@ -78,7 +93,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             question_index += 1
 
-        # 4. End of Loop - Generate and Send Final Summary
+        # 6. End of Loop - Generate and Send Final Summary
         final_summary = generate_final_summary(
             job_description_text=jd_text,
             interview_history=interview_history
