@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    name: Compile and import-check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install lightweight deps
+        # Skip whisper/torch and faiss-cpu in CI — they pull large native
+        # wheels and aren't needed to verify the source compiles and the
+        # Pydantic schemas import cleanly.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            fastapi "uvicorn[standard]" python-dotenv \
+            pydantic pypdf gtts
+      - name: Byte-compile sources
+        run: python -m compileall -q app
+      - name: Import schemas
+        run: |
+          python -c "from app.schemas import (WebSocketMessage, WebSocketError, \
+EvaluationResponse, ScoreBreakdown, InterviewQuestion, \
+InterviewQuestionsResponse, InterviewTurn, FinalSummaryResponse); print('ok')"
