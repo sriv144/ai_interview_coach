@@ -12,6 +12,7 @@ langchain-openai
 # Document & Audio Processing
 pypdf
 openai-whisper
+gTTS
 
 # Vector Store (for later)
 faiss-cpu
