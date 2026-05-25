@@ -8,8 +8,18 @@ from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from ..schemas import EvaluationResponse
 
-# Load the Whisper model once when the module is loaded
-whisper_model = whisper.load_model("base")
+# Whisper weights (~140MB for `base`) are downloaded on first use. We lazy-load
+# so `import app.agents.answer_evaluator` stays fast and offline-safe -- the
+# download only happens when an answer is actually transcribed.
+_whisper_model = None
+
+
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        _whisper_model = whisper.load_model(os.getenv("WHISPER_MODEL", "base"))
+    return _whisper_model
+
 
 def evaluate_answer(
     audio_file: bytes,
@@ -20,7 +30,7 @@ def evaluate_answer(
     temp_audio_path = None
     try:
         # --- Speech-to-Text using Whisper (Corrected Method) ---
-        print("🎤 Transcribing audio...")
+        print("\U0001F3A4 Transcribing audio...")
         
         # 1. Create a named temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio_file:
@@ -29,7 +39,7 @@ def evaluate_answer(
 
         # 2. The 'with' block is now finished, so the file is closed and the lock is released.
         #    Now, we pass the file path to Whisper.
-        result = whisper_model.transcribe(temp_audio_path)
+        result = _get_whisper_model().transcribe(temp_audio_path)
         transcribed_text = result["text"]
         print(f"✅ Transcription complete: \"{transcribed_text}\"")
 
@@ -81,7 +91,7 @@ def evaluate_answer(
 
     chain = prompt | model | parser
 
-    print("🧠 Evaluating answer...")
+    print("\U0001F9E0 Evaluating answer...")
     response = chain.invoke({
         "jd_text": job_description_text,
         "question": question_text,
