@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    name: import + compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install ffmpeg (Whisper runtime dep)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile-check all modules
+        run: python -m compileall -q app
+      - name: Import smoke test
+        env:
+          GOOGLE_API_KEY: dummy-for-import-only
+        run: |
+          # The agents raise at module import if GOOGLE_API_KEY is unset,
+          # so set a dummy value and only verify the imports resolve.
+          python -c "import app.main"
