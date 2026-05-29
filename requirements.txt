@@ -1,17 +1,19 @@
 # requirements.txt
 
-# Web Framework
+# Web framework
 fastapi
 uvicorn[standard]
 python-dotenv
 
-# LLM Orchestration
+# LLM orchestration (Google Gemini via LangChain)
 langchain
-langchain-openai
+langchain-google-genai
+google-generativeai
 
-# Document & Audio Processing
+# Document, audio & speech processing
 pypdf
 openai-whisper
+gTTS
 
-# Vector Store (for later)
+# Vector store (reserved for future retrieval features)
 faiss-cpu
