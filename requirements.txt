@@ -13,5 +13,8 @@ langchain-openai
 pypdf
 openai-whisper
 
+# Text-to-Speech (used by app/main.py to read questions back to the candidate)
+gtts
+
 # Vector Store (for later)
 faiss-cpu
