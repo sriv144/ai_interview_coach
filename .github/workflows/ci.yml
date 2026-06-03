@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint + Compile (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install system deps (ffmpeg for whisper)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff gtts langchain-google-genai
+
+      - name: Ruff lint (non-blocking)
+        run: ruff check app --output-format=github --exit-zero
+
+      - name: Compile all sources
+        env:
+          # Agents read these at import time. Dummy values let the
+          # compile / import pass succeed without real network access.
+          GOOGLE_API_KEY: 'ci-dummy-key'
+          OPENAI_API_KEY: 'ci-dummy-key'
+        run: |
+          python -m compileall -q app
