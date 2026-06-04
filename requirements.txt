@@ -1,17 +1,20 @@
 # requirements.txt
+# Aligned with the imports actually used in app/.
 
 # Web Framework
 fastapi
 uvicorn[standard]
 python-dotenv
 
-# LLM Orchestration
+# LLM Orchestration (Google Gemini via LangChain)
 langchain
-langchain-openai
+langchain-google-genai
+google-generativeai
 
 # Document & Audio Processing
-pypdf
+PyPDF2
 openai-whisper
+gTTS
 
-# Vector Store (for later)
+# Vector Store (used by future retrieval feature)
 faiss-cpu
