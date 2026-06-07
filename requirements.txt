@@ -6,7 +6,10 @@ uvicorn[standard]
 python-dotenv
 
 # LLM Orchestration
-langchain
+# Agents do `from langchain.prompts import PromptTemplate` and
+# `from langchain.output_parsers import PydanticOutputParser`.
+# Those compat re-exports were removed in langchain 1.0, so pin to the 0.3 line.
+langchain>=0.3,<1.0
 # All three agents use Google Gemini (gemini-1.5-flash-latest).
 langchain-google-genai
 google-generativeai
