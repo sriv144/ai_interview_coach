@@ -27,13 +27,13 @@ Generic interview prep tools ask canned questions and grade against canned rubri
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
-        pypdf (JD parse)         gTTS (Q → audio)
+        PyPDF2 (JD parse)        gTTS (Q → audio)
                                  Whisper (audio → text)
 ```
 
 Each turn flows through the WebSocket:
 
-1. Client uploads JD PDF as bytes → server parses with `pypdf`.
+1. Client uploads JD PDF as bytes → server parses with `PyPDF2`.
 2. `question_generator` produces a structured question list grounded in the JD.
 3. For each question:
    - Server synthesizes audio via `gTTS`, base64-encodes, ships it to the browser.
@@ -49,7 +49,7 @@ Each turn flows through the WebSocket:
 - **Streaming WebSocket UX** — questions, evaluations, and the final summary all stream back as structured Pydantic-validated JSON messages.
 - **Multi-agent design** — question generation, answer evaluation, and final summary are independent LLM agents (`app/agents/`), each with its own focused prompt.
 - **Structured outputs end-to-end** — `app/schemas.py` defines `WebSocketMessage`, `InterviewTurn`, evaluation payloads, etc. for safe client handling.
-- **PDF intake** — drop in any JD; `pypdf` extracts the text.
+- **PDF intake** — drop in any JD; `PyPDF2` extracts the text.
 
 ## Tech stack
 
@@ -61,7 +61,7 @@ Each turn flows through the WebSocket:
 | LLM orchestration | LangChain |
 | TTS | gTTS |
 | STT | openai-whisper (local) |
-| PDF | pypdf |
+| PDF | PyPDF2 |
 | Validation | Pydantic v2 |
 | Frontend | Single-page `index.html` with mic capture + audio playback |
 
@@ -77,7 +77,7 @@ Each turn flows through the WebSocket:
 │   │   ├── answer_evaluator.py     # (audio, Q, JD) → per-answer evaluation (Whisper + Gemini)
 │   │   └── summary_generator.py    # transcript → final report (Gemini)
 │   └── utils/
-│       └── document_parser.py # pypdf wrapper
+│       └── document_parser.py # PyPDF2 wrapper
 ├── index.html                 # Browser UI (upload JD, talk, see feedback)
 ├── requirements.txt
 ├── .env.example
@@ -119,6 +119,7 @@ See `.env.example` for the full list. At minimum you need `GOOGLE_API_KEY` for t
 - [ ] Side-by-side ideal-answer rubric in the per-question feedback panel
 - [ ] Dockerfile + one-command deploy
 - [ ] Pluggable LLM provider (swap Gemini for Anthropic Claude / OpenAI behind one interface)
+- [ ] Migrate PDF parsing from `PyPDF2` (legacy) to the maintained `pypdf` package
 
 ## Contributing
 

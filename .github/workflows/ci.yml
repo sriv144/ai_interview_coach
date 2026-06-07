@@ -27,14 +27,15 @@ jobs:
       # stub whisper at runtime below. The langchain pin matches
       # requirements.txt because the agents use the legacy
       # `from langchain.prompts import ...` import path that langchain 1.0
-      # removed.
+      # removed. PyPDF2 (not pypdf) is what app/utils/document_parser.py
+      # actually imports.
       - name: Install lightweight runtime deps
         run: |
           python -m pip install --upgrade pip
           pip install \
             fastapi 'uvicorn[standard]' python-dotenv \
             'langchain>=0.3,<1.0' langchain-google-genai google-generativeai \
-            pypdf pydantic gTTS
+            PyPDF2 pydantic gTTS
 
       - name: Install lint tools
         run: pip install ruff

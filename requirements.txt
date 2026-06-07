@@ -15,7 +15,10 @@ langchain-google-genai
 google-generativeai
 
 # Document & Audio Processing
-pypdf
+# app/utils/document_parser.py imports `from PyPDF2 import PdfReader`.
+# PyPDF2 is the legacy package; migration to pypdf is a code change for a
+# later pass.
+PyPDF2
 openai-whisper
 gTTS
 
