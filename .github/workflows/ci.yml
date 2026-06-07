@@ -10,6 +10,7 @@ jobs:
   lint-and-import:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.10', '3.11']
     steps:
@@ -21,29 +22,40 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install runtime deps
-          # openai-whisper pulls in torch which is heavy; the import check
-          # below only needs the FastAPI + pydantic side of the stack.
+      # openai-whisper pulls in torch (~700 MB). For an import smoke-test we
+      # only need the FastAPI + pydantic + Gemini side of the stack and we
+      # stub whisper at runtime below.
+      - name: Install lightweight runtime deps
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi 'uvicorn[standard]' python-dotenv langchain langchain-openai pypdf pydantic gTTS
+          pip install \
+            fastapi 'uvicorn[standard]' python-dotenv \
+            langchain langchain-google-genai google-generativeai \
+            pypdf pydantic gTTS
 
       - name: Install lint tools
         run: pip install ruff
 
-      - name: Ruff (lint)
+      - name: Ruff (non-blocking)
+        # Lint is informational until the codebase is fully ruff-clean.
         run: ruff check app || true
 
       - name: Smoke-import FastAPI app
+        env:
+          # question_generator.py raises at import time if GOOGLE_API_KEY is
+          # missing. genai.configure() accepts any string — we never make a
+          # real network call in CI.
+          GOOGLE_API_KEY: ci-dummy-key
         run: |
           python - <<'PY'
-          import importlib, sys
-          # Heavy/optional imports stubbed so CI can import app.main without
-          # downloading torch / whisper model weights.
-          import types
-          for stub in ('whisper',):
-              if stub not in sys.modules:
-                  sys.modules[stub] = types.ModuleType(stub)
+          import importlib, sys, types
+          # Stub whisper so we don't download torch / model weights in CI.
+          if 'whisper' not in sys.modules:
+              stub = types.ModuleType('whisper')
+              stub.load_model = lambda *_a, **_k: types.SimpleNamespace(
+                  transcribe=lambda *_a, **_k: {'text': ''}
+              )
+              sys.modules['whisper'] = stub
           mod = importlib.import_module('app.main')
           assert hasattr(mod, 'app'), 'FastAPI app not found'
           print('OK: app.main imported, FastAPI app present')

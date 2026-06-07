@@ -38,14 +38,14 @@ Each turn flows through the WebSocket:
 3. For each question:
    - Server synthesizes audio via `gTTS`, base64-encodes, ships it to the browser.
    - Browser plays the question and records the spoken answer.
-   - Server transcribes with `openai-whisper`, then `answer_evaluator` scores the response against both the question and JD.
+   - Server transcribes with `openai-whisper` (runs locally, no API call), then `answer_evaluator` scores the response against both the question and JD.
    - Per-question feedback is sent back live.
 4. After the final question, `summary_generator` produces an end-of-session report covering strengths, weaknesses, and concrete improvement areas.
 
 ## Features
 
 - **JD-grounded questions** — every question is generated from your uploaded job description, not a static bank.
-- **Voice in, voice out** — `gTTS` for question playback, `openai-whisper` for answer transcription.
+- **Voice in, voice out** — `gTTS` for question playback, local `openai-whisper` for answer transcription (no third-party STT API).
 - **Streaming WebSocket UX** — questions, evaluations, and the final summary all stream back as structured Pydantic-validated JSON messages.
 - **Multi-agent design** — question generation, answer evaluation, and final summary are independent LLM agents (`app/agents/`), each with its own focused prompt.
 - **Structured outputs end-to-end** — `app/schemas.py` defines `WebSocketMessage`, `InterviewTurn`, evaluation payloads, etc. for safe client handling.
@@ -57,12 +57,12 @@ Each turn flows through the WebSocket:
 |-------|--------|
 | Backend | FastAPI + Uvicorn |
 | Realtime | WebSockets |
+| LLM | Google Gemini (`gemini-1.5-flash-latest`) via `langchain-google-genai` |
 | LLM orchestration | LangChain |
 | TTS | gTTS |
-| STT | openai-whisper |
+| STT | openai-whisper (local) |
 | PDF | pypdf |
 | Validation | Pydantic v2 |
-| Vector store (planned) | FAISS |
 | Frontend | Single-page `index.html` with mic capture + audio playback |
 
 ## Project structure
@@ -73,9 +73,9 @@ Each turn flows through the WebSocket:
 │   ├── main.py                # FastAPI app + /ws/interview WebSocket handler
 │   ├── schemas.py             # Pydantic models for socket messages, turns, evaluations
 │   ├── agents/
-│   │   ├── question_generator.py   # JD → structured question list
-│   │   ├── answer_evaluator.py     # (audio, Q, JD) → per-answer evaluation
-│   │   └── summary_generator.py    # transcript → final report
+│   │   ├── question_generator.py   # JD → structured question list (Gemini)
+│   │   ├── answer_evaluator.py     # (audio, Q, JD) → per-answer evaluation (Whisper + Gemini)
+│   │   └── summary_generator.py    # transcript → final report (Gemini)
 │   └── utils/
 │       └── document_parser.py # pypdf wrapper
 ├── index.html                 # Browser UI (upload JD, talk, see feedback)
@@ -97,7 +97,7 @@ pip install -r requirements.txt
 
 # 3. Configure env
 cp .env.example .env
-# Edit .env and add your LLM API key
+# Edit .env and add your GOOGLE_API_KEY (https://aistudio.google.com/app/apikey)
 
 # 4. Run the server
 uvicorn app.main:app --reload --port 8000
@@ -109,7 +109,7 @@ Then open <http://localhost:8000> in your browser, allow microphone access, uplo
 
 ## Environment variables
 
-See `.env.example` for the full list. At minimum you need an LLM API key for the agent layer. Whisper runs locally and does not need an API key.
+See `.env.example` for the full list. At minimum you need `GOOGLE_API_KEY` for the Gemini-backed agent layer. Whisper runs locally and does not need an API key.
 
 ## Roadmap
 
@@ -118,6 +118,7 @@ See `.env.example` for the full list. At minimum you need an LLM API key for the
 - [ ] Resume PDF intake on the same WebSocket and cross-reference against JD gaps
 - [ ] Side-by-side ideal-answer rubric in the per-question feedback panel
 - [ ] Dockerfile + one-command deploy
+- [ ] Pluggable LLM provider (swap Gemini for Anthropic Claude / OpenAI behind one interface)
 
 ## Contributing
 

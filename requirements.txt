@@ -7,11 +7,14 @@ python-dotenv
 
 # LLM Orchestration
 langchain
-langchain-openai
+# All three agents use Google Gemini (gemini-1.5-flash-latest).
+langchain-google-genai
+google-generativeai
 
 # Document & Audio Processing
 pypdf
 openai-whisper
+gTTS
 
 # Vector Store (for later)
 faiss-cpu
