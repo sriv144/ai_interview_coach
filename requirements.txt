@@ -6,12 +6,21 @@ uvicorn[standard]
 python-dotenv
 
 # LLM Orchestration
-langchain
-langchain-openai
+# Agents do `from langchain.prompts import PromptTemplate` and
+# `from langchain.output_parsers import PydanticOutputParser`.
+# Those compat re-exports were removed in langchain 1.0, so pin to the 0.3 line.
+langchain>=0.3,<1.0
+# All three agents use Google Gemini (gemini-1.5-flash-latest).
+langchain-google-genai
+google-generativeai
 
 # Document & Audio Processing
-pypdf
+# app/utils/document_parser.py imports `from PyPDF2 import PdfReader`.
+# PyPDF2 is the legacy package; migration to pypdf is a code change for a
+# later pass.
+PyPDF2
 openai-whisper
+gTTS
 
 # Vector Store (for later)
 faiss-cpu
